@@ -103,7 +103,7 @@
 <body>
 
 <div class="container">
-  <h1>Buscar por Código SED</h1>
+  <h1>Buscar por SED</h1>
   <input type="text" id="searchInput" placeholder="Escribe un código SED (ej: E450991)">
   <button onclick="buscar()">Buscar</button>
   <div id="resultados"></div>
@@ -182,10 +182,10 @@
 
       resultadoDiv.innerHTML += `
         <div class="resultado-item">
-          <strong>SED:</strong> ${obj.ntcse}<br>
-          <strong>Dirección:</strong> ${obj.direccion || 'No disponible'}<br>
-          <strong>uunn:</strong> ${obj.uunn || 'No disponible'}<br>
-          <strong>amt:</strong> ${obj.amt || 'No disponible'}<br>
+          <strong></strong> ${obj.ntcse}<br>
+          <strong></strong> ${obj.direccion || 'No disponible'}<br>
+          <strong></strong> ${obj.uunn || 'No disponible'}<br>
+          <strong></strong> ${obj.amt || 'No disponible'}<br>
           <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#007BFF;">📍 Ver en Google Maps</a> 
         </div>
       `;
