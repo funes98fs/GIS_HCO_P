@@ -4,47 +4,60 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Buscar por SED</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"> 
+
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f6f9;
+    /* Reset básico */
+    * {
       margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
       padding: 20px;
     }
 
     .container {
-      max-width: 700px;
+      max-width: 800px;
       margin: auto;
       background: white;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
       padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
     }
 
     h1 {
       text-align: center;
       color: #2c3e50;
+      margin-bottom: 20px;
     }
 
     input[type="text"] {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
+      font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 8px;
-      font-size: 16px;
       margin-bottom: 15px;
-      box-sizing: border-box;
     }
 
     button {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       background-color: #007BFF;
       color: white;
-      font-size: 16px;
+      font-weight: bold;
       border: none;
       border-radius: 8px;
+      font-size: 16px;
       cursor: pointer;
+      transition: background-color 0.3s ease;
     }
 
     button:hover {
@@ -56,28 +69,34 @@
     }
 
     .resultado-item {
-      background: #f9f9f9;
-      border-left: 5px solid #007BFF;
-      padding: 15px;
-      margin-bottom: 15px;
+      background-color: #f1f3f5;
+      padding: 18px;
       border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      margin-bottom: 15px;
+      border-left: 5px solid #007BFF;
     }
 
     .resultado-item strong {
       color: #2c3e50;
+      display: block;
+      margin-bottom: 6px;
     }
 
-    a.map-link {
-      display: inline-block;
-      margin-top: 10px;
-      color: #007BFF;
-      text-decoration: none;
-      font-weight: bold;
+    #map {
+      height: 450px;
+      margin-top: 30px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
-    a.map-link:hover {
-      text-decoration: underline;
+    @media (max-width: 600px) {
+      .container {
+        padding: 20px;
+      }
+      input[type="text"], button {
+        font-size: 15px;
+      }
     }
   </style>
 </head>
@@ -85,17 +104,34 @@
 
 <div class="container">
   <h1>Buscar por Código SED</h1>
-  <input type="text" id="searchInput" placeholder="Escribe un código SED (ej: E420312)">
+  <input type="text" id="searchInput" placeholder="Escribe un código SED (ej: E450991)">
   <button onclick="buscar()">Buscar</button>
   <div id="resultados"></div>
 </div>
 
-<!-- Cargar PapaParse -->
+<!-- Contenedor del mapa -->
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script> 
+
+<!-- PapaParse para leer CSV -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script> 
 <script>
   let datos = [];
+  let map;
+  let marker;
 
-  // Leer el CSV y parsearlo
+  // Inicializar mapa con OpenStreetMap
+  function initMap() {
+    map = L.map('map').setView([-9.19, -75.01], 8); // Coordenadas iniciales de Perú
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',  {
+      attribution: '&copy; OpenStreetMap Contributors'
+    }).addTo(map);
+  }
+
+  // Cargar datos del CSV
   Papa.parse("datos.sed25.csv", {
     download: true,
     header: false,
@@ -107,12 +143,13 @@
           obj[header] = row[i];
         });
         return obj;
-      }).filter(obj => obj.ntcse && obj.ntcse !== "ntcse"); // Filtrar filas vacías o encabezado si aparece
+      }).filter(obj => obj.ntcse && obj.ntcse !== "ntcse"); // Filtrar encabezado si existe
 
       console.log("Datos cargados:", datos);
     }
   });
 
+  // Función de búsqueda
   function buscar() {
     const texto = document.getElementById("searchInput").value.trim().toUpperCase();
     const resultadoDiv = document.getElementById("resultados");
@@ -132,24 +169,42 @@
       return;
     }
 
+    // Limpiar marcador anterior
+    if (marker) {
+      map.removeLayer(marker);
+    }
+
+    resultadoDiv.innerHTML = ""; // Limpiar resultados anteriores
+
     resultados.forEach(obj => {
       const lat = parseFloat(obj.wgsy);
       const lng = parseFloat(obj.wgsx);
-      const linkMapa = lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : "#"; 
 
       resultadoDiv.innerHTML += `
         <div class="resultado-item">
           <strong>Código SED:</strong> ${obj.ntcse}<br>
           <strong>Dirección:</strong> ${obj.direccion || 'No disponible'}<br>
-          <strong>UUNN:</strong> ${obj.uunn || 'No disponible'}<br>
-          <strong>AMT:</strong> ${obj.amt || 'No disponible'}<br>
-          <strong>Latitud:</strong> ${obj.wgsy || 'No disponible'}<br>
-          <strong>Longitud:</strong> ${obj.wgsx || 'No disponible'}<br>
-          <a href="${linkMapa}" target="_blank" class="map-link">📍 Ver en Google Maps</a>
+          <strong>Sector:</strong> ${obj.uunn || 'No disponible'}<br>
+          <strong>Tipo:</strong> ${obj.amt || 'No disponible'}<br>
+          <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#007BFF;">📍 Ver en Google Maps</a> 
         </div>
       `;
+
+      if (lat && lng) {
+        const position = [lat, lng];
+
+        marker = L.marker(position).addTo(map)
+          .bindPopup(`<strong>${obj.ntcse}</strong><br>${obj.direccion}`);
+        map.setView(position, 13);
+        marker.openPopup();
+      }
     });
   }
+
+  // Iniciar el mapa al cargar la página
+  window.onload = function () {
+    initMap();
+  };
 </script>
 
 </body>
