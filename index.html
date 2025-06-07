@@ -9,22 +9,15 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"> 
 
   <style>
-    /* Reset básico */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
     body {
       font-family: 'Segoe UI', sans-serif;
-      background-color: #f8f9fa;
-      color: #333;
+      background-color: #f4f6f9;
+      margin: 0;
       padding: 20px;
     }
 
     .container {
-      max-width: 800px;
+      max-width: 700px;
       margin: auto;
       background: white;
       border-radius: 12px;
@@ -44,7 +37,8 @@
       font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 8px;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
     }
 
     button {
@@ -57,11 +51,32 @@
       border-radius: 8px;
       font-size: 16px;
       cursor: pointer;
-      transition: background-color 0.3s ease;
     }
 
     button:hover {
       background-color: #0056b3;
+    }
+
+    .suggestions {
+      border: 1px solid #ddd;
+      border-top: none;
+      position: absolute;
+      z-index: 100;
+      background: white;
+      width: calc(100% - 2px);
+      max-height: 150px;
+      overflow-y: auto;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+
+    .suggestion-item {
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .suggestion-item:hover {
+      background-color: #f1f1f1;
     }
 
     #resultados {
@@ -69,17 +84,30 @@
     }
 
     .resultado-item {
-      background-color: #f1f3f5;
+      background-color: #f9f9f9;
       padding: 18px;
       border-radius: 8px;
       margin-bottom: 15px;
       border-left: 5px solid #007BFF;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
 
     .resultado-item strong {
-      color: #2c3e50;
       display: block;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
+      color: #2c3e50;
+    }
+
+    a.map-link {
+      display: inline-block;
+      margin-top: 10px;
+      color: #007BFF;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    a.map-link:hover {
+      text-decoration: underline;
     }
 
     #map {
@@ -89,22 +117,16 @@
       overflow: hidden;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-
-    @media (max-width: 600px) {
-      .container {
-        padding: 20px;
-      }
-      input[type="text"], button {
-        font-size: 15px;
-      }
-    }
   </style>
 </head>
 <body>
 
 <div class="container">
   <h1>Buscar por SED</h1>
-  <input type="text" id="searchInput" placeholder="Escribe un código SED (ej: E450991)">
+  <div style="position: relative;">
+    <input type="text" id="searchInput" placeholder="Escribe un código SED (ej: E450182)" oninput="mostrarSugerencias()">
+    <div id="suggestionsBox" class="suggestions" style="display: none;"></div>
+  </div>
   <button onclick="buscar()">Buscar</button>
   <div id="resultados"></div>
 </div>
@@ -117,21 +139,22 @@
 
 <!-- PapaParse para leer CSV -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script> 
+
 <script>
   let datos = [];
   let map;
   let marker;
 
-  // Inicializar mapa con OpenStreetMap
+  // Inicializar mapa OpenStreetMap
   function initMap() {
-    map = L.map('map').setView([-9.19, -75.01], 8); // Coordenadas iniciales de Perú
+    map = L.map('map').setView([-9.19, -75.01], 8);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',  {
+    L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',  {
       attribution: '&copy; OpenStreetMap Contributors'
     }).addTo(map);
   }
 
-  // Cargar datos del CSV
+  // Cargar CSV y parsearlo
   Papa.parse("datos.sed25.csv", {
     download: true,
     header: false,
@@ -139,21 +162,55 @@
       const encabezados = ['ntcse', 'uunn', 'amt', 'direccion', 'wgsy', 'wgsx'];
       datos = results.data.map(row => {
         let obj = {};
-        encabezados.forEach((header, i) => {
-          obj[header] = row[i];
-        });
+        encabezados.forEach((header, i) => { obj[header] = row[i]; });
         return obj;
-      }).filter(obj => obj.ntcse && obj.ntcse !== "ntcse"); // Filtrar encabezado si existe
-
-      console.log("Datos cargados:", datos);
+      }).filter(obj => obj.ntcse && obj.ntcse !== "ntcse");
     }
   });
+
+  // Mostrar sugerencias mientras escribes
+  function mostrarSugerencias() {
+    const texto = document.getElementById("searchInput").value.trim().toUpperCase();
+    const suggestionsBox = document.getElementById("suggestionsBox");
+
+    if (!texto) {
+      suggestionsBox.style.display = "none";
+      return;
+    }
+
+    const resultados = datos.filter(obj =>
+      obj.ntcse?.toUpperCase().includes(texto)
+    );
+
+    suggestionsBox.innerHTML = "";
+
+    if (resultados.length === 0) {
+      suggestionsBox.style.display = "none";
+      return;
+    }
+
+    resultados.slice(0, 5).forEach(obj => {
+      const div = document.createElement("div");
+      div.className = "suggestion-item";
+      div.textContent = obj.ntcse + " - " + obj.direccion?.substring(0, 30) + "...";
+      div.onclick = () => {
+        document.getElementById("searchInput").value = obj.ntcse;
+        suggestionsBox.style.display = "none";
+        buscar(); // Buscar automáticamente al hacer clic
+      };
+      suggestionsBox.appendChild(div);
+    });
+
+    suggestionsBox.style.display = "block";
+  }
 
   // Función de búsqueda
   function buscar() {
     const texto = document.getElementById("searchInput").value.trim().toUpperCase();
     const resultadoDiv = document.getElementById("resultados");
+    const suggestionsBox = document.getElementById("suggestionsBox");
     resultadoDiv.innerHTML = "";
+    suggestionsBox.style.display = "none"; // Ocultar sugerencias después de buscar
 
     if (!texto) {
       resultadoDiv.innerHTML = "<p>Escribe un código SED para buscar.</p>";
@@ -170,11 +227,7 @@
     }
 
     // Limpiar marcador anterior
-    if (marker) {
-      map.removeLayer(marker);
-    }
-
-    resultadoDiv.innerHTML = ""; // Limpiar resultados anteriores
+    if (marker) marker.remove();
 
     resultados.forEach(obj => {
       const lat = parseFloat(obj.wgsy);
@@ -182,20 +235,19 @@
 
       resultadoDiv.innerHTML += `
         <div class="resultado-item">
-          <strong></strong> ${obj.ntcse}<br>
-          <strong></strong> ${obj.direccion || 'No disponible'}<br>
-          <strong></strong> ${obj.uunn || 'No disponible'}<br>
-          <strong></strong> ${obj.amt || 'No disponible'}<br>
-          <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#007BFF;">📍 Ver en Google Maps</a> 
+          🔺</strong> ${obj.ntcse}<br>
+          📌</strong> ${obj.direccion || 'No disponible'}<br>
+          ✔️</strong> ${obj.uunn || 'No disponible'}<br>
+          ✔️</strong> ${obj.amt || 'No disponible'}<br>
+          <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="map-link">🗺️ Ver en Google Maps</a>
         </div>
       `;
 
       if (lat && lng) {
-        const position = [lat, lng];
-
-        marker = L.marker(position).addTo(map)
+        if (marker) marker.remove();
+        marker = L.marker([lat, lng]).addTo(map)
           .bindPopup(`<strong>${obj.ntcse}</strong><br>${obj.direccion}`);
-        map.setView(position, 13);
+        map.setView([lat, lng], 13);
         marker.openPopup();
       }
     });
@@ -205,6 +257,14 @@
   window.onload = function () {
     initMap();
   };
+
+  // Cerrar sugerencias al hacer clic fuera del input
+  document.addEventListener("click", function(e) {
+    const suggestionsBox = document.getElementById("suggestionsBox");
+    if (!document.getElementById("searchInput").contains(e.target)) {
+      suggestionsBox.style.display = "none";
+    }
+  });
 </script>
 
 </body>
