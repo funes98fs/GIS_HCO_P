@@ -182,10 +182,10 @@
 
       resultadoDiv.innerHTML += `
         <div class="resultado-item">
-          <strong>Código SED:</strong> ${obj.ntcse}<br>
+          <strong>SED:</strong> ${obj.ntcse}<br>
           <strong>Dirección:</strong> ${obj.direccion || 'No disponible'}<br>
-          <strong>Sector:</strong> ${obj.uunn || 'No disponible'}<br>
-          <strong>Tipo:</strong> ${obj.amt || 'No disponible'}<br>
+          <strong>uunn:</strong> ${obj.uunn || 'No disponible'}<br>
+          <strong>amt:</strong> ${obj.amt || 'No disponible'}<br>
           <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#007BFF;">📍 Ver en Google Maps</a> 
         </div>
       `;
